@@ -6,7 +6,7 @@ import OSLog
 import QuartzCore
 
 private let log = Logger(subsystem: "io.github.desperadolky.qiping", category: "interaction")
-private let appName = "栖屏"
+private let appName = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "Less Pain Code"
 
 private enum RailColors {
     static let surface = color(0x202630)
@@ -864,7 +864,7 @@ private final class Navigator: NSObject, NSApplicationDelegate {
         menu.addItem(item("辅助功能设置…", #selector(requestPermission)))
         menu.addItem(item("桌面快捷键设置…", #selector(openKeyboardSettings)))
         menu.addItem(.separator())
-        menu.addItem(item("退出栖屏", #selector(quit)))
+        menu.addItem(item("退出 \(appName)", #selector(quit)))
         return menu
     }
 
@@ -910,7 +910,7 @@ extension Navigator: NSMenuDelegate {
 }
 
 @main
-private struct Qiping {
+private struct LessPainCode {
     @MainActor static func main() {
         let app = NSApplication.shared
         let navigator = Navigator()

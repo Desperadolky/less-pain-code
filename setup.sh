@@ -24,15 +24,17 @@ if [[ ${1:-} == --test ]]; then
     exit 0
 fi
 
-staging_dir="$(mktemp -d "$build_dir/.qiping.XXXXXX")"
+app_name="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$repo_dir/Info.plist")"
+executable_name="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$repo_dir/Info.plist")"
+staging_dir="$(mktemp -d "$build_dir/.less-pain-code.XXXXXX")"
 trap 'rm -rf "$staging_dir"' EXIT
-staged_app="$staging_dir/Qiping.app"
+staged_app="$staging_dir/$app_name.app"
 resources="$staged_app/Contents/Resources"
 mkdir -p "$staged_app/Contents/MacOS" "$resources"
 
 "$swiftc" "${swift_args[@]}" -O \
     "$repo_dir/Sources/MouseNav.swift" "$repo_dir/Sources/MacSpaces.swift" \
-    "$repo_dir/Sources/SpaceCycle.swift" -o "$staged_app/Contents/MacOS/Qiping"
+    "$repo_dir/Sources/SpaceCycle.swift" -o "$staged_app/Contents/MacOS/$executable_name"
 cp "$repo_dir/Info.plist" "$staged_app/Contents/"
 cp "$repo_dir/Resources/AppIcon.icns" "$repo_dir/Resources/WhiteCat.svg" \
     "$repo_dir/LICENSE" "$repo_dir/THIRD_PARTY_NOTICES.md" "$resources/"
@@ -40,7 +42,7 @@ cp -R "$repo_dir/licenses" "$resources/"
 codesign --force --sign - --timestamp=none "$staged_app"
 codesign --verify --strict "$staged_app"
 
-app="$build_dir/Qiping.app"
+app="$build_dir/$app_name.app"
 rm -rf "$app"
 mv "$staged_app" "$app"
 printf 'Built %s\n' "$app"

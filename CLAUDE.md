@@ -1,6 +1,6 @@
-# Qiping
+# Less Pain Code
 
-- `./setup.sh` runs route checks and builds and signs a local app at `build/Qiping.app`.
+- `./setup.sh` runs route checks and builds and signs a local app at `build/Less Pain Code.app`.
 - `./setup.sh --test` runs the standalone route checks without building the app.
 - `Sources/MouseNav.swift` implements the AppKit floating panel, menus and shortcuts.
 - `Sources/MacSpaces.swift` reads desktop topology and performs system desktop switching.
