@@ -1,0 +1,12 @@
+.DS_Store
+/.build/
+/build/
+/dist/
+*.app/
+*.dmg
+*.log
+*.pem
+*.p12
+*.keychain*
+.env
+.env.*
