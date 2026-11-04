@@ -296,6 +296,7 @@ private final class Navigator: NSObject, NSApplicationDelegate {
     private var displayFrames: [(id: CGDirectDisplayID, frame: NSRect)] = []
     private var shownDisplay: CGDirectDisplayID?
     private var pointerTimer: Timer?
+    private var railRecoveryTask: Task<Void, Never>?
     private var recent: [pid_t] = []
     private var observers: [NSObjectProtocol] = []
     private var statusItem: NSStatusItem?
@@ -319,8 +320,9 @@ private final class Navigator: NSObject, NSApplicationDelegate {
             forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self, self.cycleTask == nil else { return }
-                self.updateCycleCaption()
+                guard let self else { return }
+                self.recoverRailAfterSpaceChange()
+                if self.cycleTask == nil { self.updateCycleCaption() }
             }
         })
         installMenuBarItem()
@@ -333,6 +335,7 @@ private final class Navigator: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         pointerTimer?.invalidate()
+        railRecoveryTask?.cancel()
         cancelCycle()
     }
 
@@ -394,12 +397,37 @@ private final class Navigator: NSObject, NSApplicationDelegate {
         guard force || display != shownDisplay else { return }
 
         if shownDisplay != display {
+            railRecoveryTask?.cancel()
             if let shownDisplay { rails[shownDisplay]?.panel.orderOut(nil) }
             cancelCycle()
         }
         shownDisplay = display
         if let display { rails[display]?.panel.orderFrontRegardless() }
         updateCycleCaption()
+    }
+
+    private func recoverRailAfterSpaceChange() {
+        railRecoveryTask?.cancel()
+        guard visible, let display = shownDisplay else { return }
+        railRecoveryTask = Task { [weak self] in
+            // The Space notification can arrive before the transition has finished.
+            for delay in [500, 500] {
+                try? await Task.sleep(for: .milliseconds(delay))
+                guard !Task.isCancelled, let self, self.visible,
+                      self.shownDisplay == display, self.pointerDisplay() == display,
+                      let rail = self.rails[display] else { return }
+                guard !rail.isDragging else { continue }
+
+                let panel = rail.panel
+                if panel.isVisible, panel.isOnActiveSpace, panel.occlusionState.contains(.visible) {
+                    continue
+                }
+                // Reattach the panel if macOS left it offscreen during the transition.
+                panel.orderOut(nil)
+                panel.orderFrontRegardless()
+                log.info("rail reordered after Space change display=\(display)")
+            }
+        }
     }
 
     private func pointerDisplay() -> CGDirectDisplayID? {
@@ -497,7 +525,7 @@ private final class Navigator: NSObject, NSApplicationDelegate {
 
     private func makeRail(screen: NSScreen) -> Rail {
         let panel = PassivePanel()
-        panel.collectionBehavior.insert(.stationary)
+        panel.collectionBehavior.formUnion([.stationary, .canJoinAllApplications])
         let base = NSView()
         base.wantsLayer = true
         base.layer?.cornerRadius = 14
