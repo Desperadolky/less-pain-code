@@ -283,7 +283,7 @@ private enum Shortcuts {
 @MainActor
 private final class Navigator: NSObject, NSApplicationDelegate {
     private let workspace = NSWorkspace.shared
-    private let catArtwork = Bundle.main.url(forResource: "WhiteCat", withExtension: "svg")
+    private let catArtwork = Bundle.main.url(forResource: "WhiteCat", withExtension: "png")
         .flatMap { NSImage(contentsOf: $0) } ?? NSImage(systemSymbolName: "pawprint.fill", accessibilityDescription: nil)
     private var rails: [CGDirectDisplayID: Rail] = [:]
     private var desktopLabels: [CGDirectDisplayID: NSTextField] = [:]
@@ -296,6 +296,9 @@ private final class Navigator: NSObject, NSApplicationDelegate {
     private var displayFrames: [(id: CGDirectDisplayID, frame: NSRect)] = []
     private var shownDisplay: CGDirectDisplayID?
     private var pointerTimer: Timer?
+    private var pointerWrap: PointerWrap?
+    private var globalPointerMonitor: Any?
+    private var localPointerMonitor: Any?
     private var railRecoveryTask: Task<Void, Never>?
     private var recent: [pid_t] = []
     private var observers: [NSObjectProtocol] = []
@@ -328,6 +331,7 @@ private final class Navigator: NSObject, NSApplicationDelegate {
         installMenuBarItem()
         refreshScreens()
         startFollowingPointer()
+        if UserDefaults.standard.bool(forKey: "pointerWrapEnabled") { startPointerWrap() }
         log.notice("launch displays=\(self.rails.count) postEvents=\(Shortcuts.permitted) axTrusted=\(AXIsProcessTrusted()) spacesRead=\(self.spaces.displays() != nil)")
     }
 
@@ -335,6 +339,7 @@ private final class Navigator: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         pointerTimer?.invalidate()
+        stopPointerWrap()
         railRecoveryTask?.cancel()
         cancelCycle()
     }
@@ -366,6 +371,7 @@ private final class Navigator: NSObject, NSApplicationDelegate {
         displayFrames = screens.compactMap { screen in
             screen.displayID.map { ($0, screen.frame) }
         }
+        pointerWrap = PointerWrap(frames: displayFrames.map { CGDisplayBounds($0.id) })
         let online = Set(displayFrames.map(\.id))
         for id in Set(rails.keys).subtracting(online) {
             rails.removeValue(forKey: id)?.panel.close()
@@ -389,6 +395,44 @@ private final class Navigator: NSObject, NSApplicationDelegate {
         timer.tolerance = 0.02
         RunLoop.main.add(timer, forMode: .common)
         pointerTimer = timer
+    }
+
+    private func startPointerWrap() {
+        globalPointerMonitor = NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved) { [weak self] event in
+            MainActor.assumeIsolated { self?.wrapPointer(for: event) }
+        }
+        guard globalPointerMonitor != nil else {
+            log.error("pointer wrap could not start monitoring mouse movement")
+            return
+        }
+        localPointerMonitor = NSEvent.addLocalMonitorForEvents(matching: .mouseMoved) { [weak self] event in
+            self?.wrapPointer(for: event)
+            return event
+        }
+        log.notice("pointer wrap enabled")
+    }
+
+    private func stopPointerWrap() {
+        if let globalPointerMonitor { NSEvent.removeMonitor(globalPointerMonitor) }
+        if let localPointerMonitor { NSEvent.removeMonitor(localPointerMonitor) }
+        globalPointerMonitor = nil
+        localPointerMonitor = nil
+        pointerWrap?.reset()
+    }
+
+    private func wrapPointer(for event: NSEvent) {
+        guard NSEvent.pressedMouseButtons == 0 else {
+            pointerWrap?.reset()
+            return
+        }
+        guard let point = event.cgEvent?.location,
+              let destination = pointerWrap?.destination(
+                at: point, dx: event.deltaX, dy: event.deltaY, time: event.timestamp
+              ),
+              let cursor = CGEvent(source: nil)?.location, abs(cursor.x - point.x) <= 1,
+              CGWarpMouseCursorPosition(destination) == .success else { return }
+        updateRailVisibility()
+        log.info("pointer wrapped left=\(destination.x < point.x)")
     }
 
     private func updateRailVisibility(force: Bool = false) {
@@ -888,6 +932,9 @@ private final class Navigator: NSObject, NSApplicationDelegate {
         let cycleItem = item("跨屏循环", #selector(toggleCycle))
         cycleItem.state = cycleEnabled ? .on : .off
         menu.addItem(cycleItem)
+        let wrapItem = item("鼠标跨屏绕回", #selector(togglePointerWrap))
+        wrapItem.state = globalPointerMonitor == nil ? .off : .on
+        menu.addItem(wrapItem)
         menu.addItem(.separator())
         menu.addItem(item("辅助功能设置…", #selector(requestPermission)))
         menu.addItem(item("桌面快捷键设置…", #selector(openKeyboardSettings)))
@@ -902,6 +949,15 @@ private final class Navigator: NSObject, NSApplicationDelegate {
         cancelCycle()
         updateCycleCaption()
         statusItem?.menu?.items.first(where: { $0.action == #selector(toggleCycle) })?.state = cycleEnabled ? .on : .off
+    }
+
+    @objc private func togglePointerWrap() {
+        if globalPointerMonitor == nil {
+            startPointerWrap()
+        } else {
+            stopPointerWrap()
+        }
+        UserDefaults.standard.set(globalPointerMonitor != nil, forKey: "pointerWrapEnabled")
     }
 
     @objc private func toggleVisibility() {
@@ -934,6 +990,8 @@ private final class Navigator: NSObject, NSApplicationDelegate {
 extension Navigator: NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.items.first?.title = visible ? "隐藏导航栏" : "显示导航栏"
+        menu.items.first(where: { $0.action == #selector(togglePointerWrap) })?.state =
+            globalPointerMonitor == nil ? .off : .on
     }
 }
 

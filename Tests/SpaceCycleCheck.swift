@@ -48,5 +48,30 @@ struct SpaceCycleCheck {
         oneSpace.confirm(aFirst, forward: true)
         precondition(oneSpace.target(forward: false, displays: atBoundary).space == 302)
         print("PASS: forward/reverse wrap, B origin, caption, topology, reorder and C boundary reversal")
+        checkPointerWrap()
+    }
+
+    private static func checkPointerWrap() {
+        let a = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let b = CGRect(x: 1512, y: 0, width: 1920, height: 1080)
+        let c = CGRect(x: 3432, y: 0, width: 1920, height: 1080)
+        var wrap = PointerWrap(frames: [b, c, a])!
+        let aLeft = CGPoint(x: 0, y: 400)
+        let cRight = CGPoint(x: 5351.5, y: 1050)
+        precondition(wrap.destination(at: aLeft, dx: -12, dy: 0, time: 1) == nil)
+        precondition(wrap.destination(at: aLeft, dx: -3, dy: 0, time: 1.01) == nil)
+        precondition(wrap.destination(at: aLeft, dx: -3, dy: 0, time: 1.02) == CGPoint(x: 5344, y: 400))
+        precondition(wrap.destination(at: cRight, dx: 9, dy: 0, time: 2) == nil)
+        precondition(wrap.destination(at: cRight, dx: 9, dy: 0, time: 2.01) == CGPoint(x: 8, y: 974))
+        precondition(wrap.destination(at: aLeft, dx: -9, dy: 0, time: 3) == nil)
+        precondition(wrap.destination(at: aLeft, dx: -9, dy: 0, time: 3.5) == nil)
+        precondition(wrap.destination(at: aLeft, dx: 9, dy: 0, time: 3.51) == nil)
+        precondition(wrap.destination(at: aLeft, dx: -9, dy: 0, time: 3.52) == nil)
+        for time in [4.0, 4.01] {
+            precondition(wrap.destination(at: CGPoint(x: 1511, y: 400), dx: 9, dy: 0, time: time) == nil)
+        }
+        precondition(PointerWrap(frames: [a]) == nil)
+        precondition(PointerWrap(frames: [a, a.offsetBy(dx: 0, dy: 982)]) == nil)
+        print("PASS: pointer wrapping in both directions, edge intent, middle boundary and single/vertical layouts")
     }
 }

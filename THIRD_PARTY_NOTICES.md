@@ -6,3 +6,7 @@ The app builds with the macOS SDK and has no third-party runtime dependencies. T
 - **Hammerspoon (MIT)**. The [`hs.spaces` module](https://github.com/Hammerspoon/hammerspoon/blob/master/extensions/spaces/spaces.lua) documents the Mission Control Accessibility hierarchy used to find the target desktop button. The original copyright and license text are in [licenses/Hammerspoon.txt](licenses/Hammerspoon.txt).
 
 yabai credits [InstantSpaceSwitcher](https://github.com/jurplel/InstantSpaceSwitcher) and [wacom-driver-fix](https://github.com/thenickdude/wacom-driver-fix/blob/bdfda9a788934c88d09d31ea6a42664b9ba1471e/Readme.md) and notes that the gesture technique was first observed in BetterTouchTool. [Instant Space Switcher (iss)](https://github.com/joshuarli/iss) was also consulted for gesture field definitions.
+
+## Watercolor white-cat artwork
+
+`Resources/WhiteCat.png` is the project owner’s selected watercolor white-cat artwork. It is included with the owner’s authorization and used in both expanded and collapsed toolbar states.

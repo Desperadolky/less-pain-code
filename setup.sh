@@ -17,7 +17,7 @@ target="$(uname -m)-apple-macos$minimum_macos"
 swift_args=(-sdk "$sdk" -target "$target" -module-cache-path "$build_dir/module-cache")
 
 "$swiftc" "${swift_args[@]}" \
-    "$repo_dir/Sources/SpaceCycle.swift" "$repo_dir/Tests/SpaceCycleCheck.swift" \
+    "$repo_dir/Sources/SpaceCycle.swift" "$repo_dir/Sources/PointerWrap.swift" "$repo_dir/Tests/SpaceCycleCheck.swift" \
     -o "$build_dir/SpaceCycleCheck"
 "$build_dir/SpaceCycleCheck"
 if [[ ${1:-} == --test ]]; then
@@ -34,9 +34,9 @@ mkdir -p "$staged_app/Contents/MacOS" "$resources"
 
 "$swiftc" "${swift_args[@]}" -O \
     "$repo_dir/Sources/MouseNav.swift" "$repo_dir/Sources/MacSpaces.swift" \
-    "$repo_dir/Sources/SpaceCycle.swift" -o "$staged_app/Contents/MacOS/$executable_name"
+    "$repo_dir/Sources/SpaceCycle.swift" "$repo_dir/Sources/PointerWrap.swift" -o "$staged_app/Contents/MacOS/$executable_name"
 cp "$repo_dir/Info.plist" "$staged_app/Contents/"
-cp "$repo_dir/Resources/AppIcon.icns" "$repo_dir/Resources/WhiteCat.svg" \
+cp "$repo_dir/Resources/AppIcon.icns" "$repo_dir/Resources/WhiteCat.png" \
     "$repo_dir/LICENSE" "$repo_dir/THIRD_PARTY_NOTICES.md" "$resources/"
 cp -R "$repo_dir/licenses" "$resources/"
 codesign --force --sign - --timestamp=none "$staged_app"
